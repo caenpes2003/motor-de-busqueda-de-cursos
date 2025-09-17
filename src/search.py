@@ -344,6 +344,34 @@ class CourseSearchEngine:
 
 
 
+    def calculate_smart_ranking(self, course_id: str, query_words: List[str]) -> float:
+        """
+        Calcula ranking inteligente que prioriza cobertura de consulta
+
+        Args:
+            course_id: ID del curso
+            query_words: Palabras de la consulta
+
+        Returns:
+            Score que prioriza coincidencias múltiples
+        """
+        if not query_words or course_id not in self.courses:
+            return 0.0
+
+        # Paso 1: Calcular cobertura de consulta (más importante)
+        course_words = set(self.course_word_counts.get(course_id, {}).keys())
+        matching_words = set(query_words) & course_words
+        coverage = len(matching_words) / len(query_words)
+
+        # Paso 2: Calcular cosine para desempate entre cursos con misma cobertura
+        cosine_score = self.calculate_cosine_similarity(course_id, query_words)
+
+        # Paso 3: Ranking híbrido - cobertura domina, cosine desempata
+        # Multiplicar cobertura por 10 para que domine sobre cosine (0-1)
+        hybrid_score = (coverage * 10.0) + cosine_score
+
+        return hybrid_score
+
     def search(self, query: str, max_results: int = 10, method: str = 'cosine') -> List[Tuple[str, float, Dict]]:
         """
         Realiza busqueda de cursos
@@ -388,8 +416,10 @@ class CourseSearchEngine:
                 score = self.calculate_relevance_score(course_id, query_words)
             elif method == 'tfidf':
                 score = self.calculate_tf_idf_score(course_id, query_words)
+            elif method == 'smart':
+                score = self.calculate_smart_ranking(course_id, query_words)
             else:
-                raise ValueError(f"Metodo desconocido: {method}. Disponibles: 'cosine', 'relevance', 'tfidf'")
+                raise ValueError(f"Metodo desconocido: {method}. Disponibles: 'cosine', 'relevance', 'tfidf', 'smart'")
 
             if score > 0:
                 course_info = self.courses[course_id]
@@ -544,7 +574,7 @@ class CourseSearchEngine:
 
 
 def search(query: str, courses_file: str = 'curso.json',
-          index_file: str = 'curso.csv', max_results: int = 10) -> List[str]:
+          index_file: str = 'curso.csv', max_results: int = 10, method: str = 'smart') -> List[str]:
     """
     Funcion de busqueda standalone
 
@@ -558,7 +588,7 @@ def search(query: str, courses_file: str = 'curso.json',
         Lista de URLs ordenadas por relevancia
     """
     engine = CourseSearchEngine(courses_file, index_file)
-    results = engine.search(query, max_results, method='cosine')
+    results = engine.search(query, max_results, method=method)
 
     # Retornar URLs ordenadas por relevancia
     urls = []
@@ -571,7 +601,7 @@ def search(query: str, courses_file: str = 'curso.json',
 
 
 def search_with_scores(query: str, courses_file: str = 'curso.json',
-                      index_file: str = 'curso.csv', max_results: int = 10) -> List[Tuple[str, float]]:
+                      index_file: str = 'curso.csv', max_results: int = 10, method: str = 'smart') -> List[Tuple[str, float]]:
     """
     Funcion de busqueda que retorna IDs y scores (para compatibilidad)
 
@@ -585,7 +615,7 @@ def search_with_scores(query: str, courses_file: str = 'curso.json',
         Lista de tuplas (course_id, cosine_similarity_score)
     """
     engine = CourseSearchEngine(courses_file, index_file)
-    results = engine.search(query, max_results, method='cosine')
+    results = engine.search(query, max_results, method=method)
 
     # Retornar ID y score
     return [(course_id, score) for course_id, score, _ in results]
