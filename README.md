@@ -14,10 +14,14 @@ Este proyecto implementa un motor de búsqueda completo para el catálogo de cur
 
 **Implementación del Algoritmo de Ranking:**
 
-El sistema utiliza una métrica de relevancia personalizada llamada **Relevance Score** que se calcula como:
+El sistema utiliza un **algoritmo híbrido inteligente (Smart Ranking)** que combina:
+
+1. **Cobertura de Consulta** (prioritaria): Qué porcentaje de palabras buscadas contiene el curso
+2. **Similitud Semántica** (desempate): Análisis TF-IDF para refinamiento
 
 ```
-Relevance Score = (Coincidencias de consulta en el curso) / (Total de palabras en la consulta)
+Smart Score = (Cobertura × 10.0) + Similitud_Coseno
+Cobertura = Palabras_coincidentes / Total_palabras_consulta
 ```
 
 **Proceso de Ranking Detallado:**
@@ -32,33 +36,36 @@ Relevance Score = (Coincidencias de consulta en el curso) / (Total de palabras e
    - Identificación de todos los cursos que contienen al menos una palabra de la consulta
    - Construcción de un índice invertido para acceso O(1)
 
-3. **Cálculo de Relevancia:**
-   - Para cada curso candidato: contar coincidencias exactas de palabras
-   - Normalización por el número total de términos en la consulta
-   - Score en rango [0,1] donde 1 = coincidencia perfecta
+3. **Cálculo de Smart Ranking:**
+   - **Paso 1**: Calcular cobertura de consulta (palabras coincidentes / total palabras)
+   - **Paso 2**: Calcular similitud coseno TF-IDF para cursos con igual cobertura
+   - **Paso 3**: Combinar con peso 10:1 (cobertura domina, coseno desempata)
+   - Score híbrido que prioriza coincidencias múltiples
 
-4. **Ordenamiento y Filtrado:**
-   - Ordenamiento descendente por score de relevancia
-   - Filtrado de scores mínimos (threshold configurable)
-   - Retorno de URLs ordenadas por relevancia
+4. **Ordenamiento Inteligente:**
+   - Primero: Cursos que contienen MÁS palabras de la consulta
+   - Segundo: Entre cursos con igual cobertura, mejor calidad semántica
+   - Resultado: Ranking intuitivo que coincide con expectativas del usuario
 
-**Ventajas del Algoritmo:**
-- **Simplicidad computacional**: O(n*m) donde n=cursos, m=palabras consulta
-- **Interpretabilidad**: Score representa porcentaje directo de coincidencias
-- **Normalización automática**: Siempre en rango [0,1]
-- **Eficiencia**: Sin necesidad de vectores TF-IDF complejos
+**Ventajas del Smart Ranking:**
+- **Comportamiento intuitivo**: Cursos con más palabras de la consulta aparecen primero
+- **Calidad semántica**: Mantiene sofisticación TF-IDF para desempates
+- **Solución híbrida**: Combina simplicidad de conteo con análisis semántico
+- **Resultados esperados**: Elimina comportamientos contraintuitivos del TF-IDF puro
 
-**Ejemplo Práctico:**
+**Ejemplo Práctico de Mejora:**
 ```python
 from src.search import search
 
-# Consulta: "programación web javascript"
-urls = search(["programación", "web", "javascript"])
+# Consulta: "gestión proyectos"
+# ANTES (Cosine): "monitoreo restauración" (1 palabra) > "gestión proyectos PMI" (2 palabras)
+# AHORA (Smart):  "gestión proyectos PMI" (2 palabras) > "monitoreo restauración" (1 palabra)
 
-# Resultado ordenado:
-# 1. Curso con 3/3 coincidencias (score=1.0)
-# 2. Curso con 2/3 coincidencias (score=0.67)
-# 3. Curso con 1/3 coincidencias (score=0.33)
+urls_smart = search("gestión proyectos", method='smart')
+# Resultado inteligente:
+# 1. Gestión de Proyectos PMI (cobertura=100%, cosine=alto)
+# 2. Planificación Proyectos Viales (cobertura=100%, cosine=medio)
+# 3. Gobierno Análisis Datos (cobertura=50%, cosine=alto)
 ```
 
 ### 2. Métrica de Similitud para Comparar Dos Cursos
@@ -136,17 +143,17 @@ similarity = compare(course1, course2, method='combined')
 - **Vectorización TF-IDF** para importancia de términos
 - **Patrones semánticos** para similitud conceptual
 
-#### 3.2 Curso-Intereses (Métrica de Relevancia)
+#### 3.2 Curso-Intereses (Smart Ranking Híbrido)
 ```python
-# Métrica única optimizada
-relevance = search(user_interests)
+# Algoritmo híbrido inteligente
+urls = search(user_interests, method='smart')
 ```
 
 **Características:**
-- **Métrica única "Relevance"**: Coincidencias/Total_términos_consulta
-- **Análisis unidireccional** de intereses hacia cursos
-- **Matching exacto** sin ponderación compleja
-- **Optimizada para velocidad** en búsquedas interactivas
+- **Smart Ranking híbrido**: Cobertura prioritaria + TF-IDF para desempate
+- **Análisis unidireccional** de intereses hacia cursos con calidad semántica
+- **Comportamiento intuitivo**: Más palabras coincidentes = mejor ranking
+- **Optimizada para UX**: Resultados esperados por el usuario
 
 #### 3.2 Justificación de Métricas Separadas
 
@@ -268,9 +275,9 @@ performance = PerformanceMetrics(
 #### 4.4 Recomendaciones de Uso por Caso
 
 **Búsqueda Interactiva (Curso-Intereses):**
-- **Métrica**: Relevance Score
-- **Tiempo objetivo**: < 2ms
-- **Justificación**: Velocidad crítica para UX
+- **Métrica**: Smart Ranking (híbrido)
+- **Tiempo objetivo**: < 5ms
+- **Justificación**: Balance óptimo entre UX intuitiva y calidad semántica
 
 **Análisis Académico (Curso-Curso):**
 - **Métrica**: Combined o Semántico
@@ -320,11 +327,8 @@ Buscador/
 │   ├── crawler.py      # Rastreador web principal (incluye funciones util)
 │   ├── search.py       # Motor de búsqueda (incluye funciones util)
 │   └── compare.py      # Comparador de similitud
-├── sql/
-│   ├── tabla.sql       # Estructura de base de datos
-│   └── consultas.sql   # Consultas de busqueda SQL
-├── docs/
-│   └── README.md       # Documentación adicional (deprecated)
+├── tabla.sql           # Estructura de base de datos
+├── consultas.sql       # Consultas de busqueda SQL
 └── README.md           # Este archivo principal
 ```
 
@@ -334,7 +338,7 @@ Buscador/
 
 **Comando de Terminal:**
 ```bash
-python src/crawler.py 10 curso_dictionary.json curso_index.csv
+python src/crawler.py 10 curso.json curso.csv
 ```
 
 **O con valores por defecto:**
@@ -347,7 +351,7 @@ python src/crawler.py
 from src.crawler import go
 
 # Rastrear 10 paginas y generar indice
-go(10, "curso_dictionary.json", "curso_index.csv")
+go(10, "curso.json", "curso.csv")
 ```
 
 ### 2. Buscar Cursos
@@ -359,7 +363,7 @@ python src/search.py "inteligencia artificial"
 
 **Con archivos específicos:**
 ```bash
-python src/search.py "gestion proyectos" curso_dictionary.json curso_index.csv 5
+python src/search.py "gestion proyectos" curso.json curso.csv 5
 ```
 
 **O desde Python:**
@@ -380,7 +384,7 @@ python src/compare.py "propiedad-horizontal" "marketing-digital-avanzado"
 
 **Con archivos específicos:**
 ```bash
-python src/compare.py "curso1" "curso2" curso_dictionary.json curso_index.csv
+python src/compare.py "curso1" "curso2" curso.json curso.csv
 ```
 
 **O desde Python:**
@@ -423,9 +427,9 @@ python src/compare.py "inteligencia-artificial" "machine-learning"
 python src/search.py "inteligencia artificial machine learning"
 ```
 
-**Buscar con limite de resultados:**
+**Buscar con limite de resultados (método recomendado):**
 ```bash
-python src/search.py "gestion" curso_dictionary.json curso_index.csv 3
+python src/search.py "gestion" curso.json curso.csv 3 smart
 ```
 
 **Rastrear con archivos personalizados:**
@@ -448,22 +452,25 @@ python src/compare.py
 **Formato de argumentos:**
 ```bash
 # Rastreador: paginas [diccionario] [indice]
-python src/crawler.py 10 curso_dictionary.json curso_index.csv
+python src/crawler.py 10 curso.json curso.csv
 
-# Busqueda: "consulta" [archivo_cursos] [archivo_indice] [max_resultados]
-python src/search.py "inteligencia artificial" curso_dictionary.json curso_index.csv 5
+# Busqueda: "consulta" [archivo_cursos] [archivo_indice] [max_resultados] [metodo]
+python src/search.py "inteligencia artificial" curso.json curso.csv 5 smart
 
 # Comparacion: "curso1" "curso2" [archivo_cursos] [archivo_indice]
-python src/compare.py "curso-1" "curso-2" curso_dictionary.json curso_index.csv
+python src/compare.py "curso-1" "curso-2" curso.json curso.csv
 ```
 
 ## Algoritmos Implementados
 
 ### Motor de Busqueda
+- **Smart** (Recomendado): Algoritmo híbrido que prioriza cobertura de consulta
+- **Cosine**: Similitud coseno con vectores TF-IDF
 - **Relevance**: Coincidencias_consulta / Total_palabras_consulta
-  - Métrica única para relacionar cursos con intereses del usuario
-  - Normalizada en rango [0,1]
-  - Optimizada para matching directo de palabras clave
+- **TF-IDF**: Frecuencia de términos con frecuencia inversa de documentos
+  - 4 métodos de scoring disponibles
+  - Smart elimina comportamientos contraintuitivos
+  - Optimizada para experiencia de usuario natural
 
 ### Similitud entre Cursos
 - **Jaccard**: Interseccion/Union de palabras
@@ -476,7 +483,7 @@ python src/compare.py "curso-1" "curso-2" curso_dictionary.json curso_index.csv
 
 ### Datos Indexados
 - **61 cursos** indexados exitosamente
-- **Más de 300 palabras únicas** en el índice de búsqueda
+- **1,959 palabras únicas** en el índice de búsqueda
 - **Cobertura completa** del catálogo de Educación Virtual
 
 ### Performance
@@ -495,7 +502,8 @@ python src/compare.py "curso-1" "curso-2" curso_dictionary.json curso_index.csv
 
 ### Motor de Busqueda (search.py)
 - **Indice invertido** optimizado para busqueda rapida
-- **3 metodos de scoring** para diferentes necesidades
+- **4 metodos de scoring**: smart, cosine, relevance, tfidf
+- **Smart ranking híbrido** como método principal (recomendado)
 - **Normalizacion de queries** con limpieza automatica
 - **Retorno de URLs** como requiere la especificacion
 
@@ -574,11 +582,12 @@ def _get_memory_usage(self) -> float:
 
 ### Principales Hallazgos
 
-#### 1. Efectividad de Métricas Separadas
-La decisión de usar métricas diferentes para Curso-Curso vs Curso-Intereses se justifica empíricamente:
-- **28x más rápido** búsqueda con Relevance vs Combined
-- **Mejor UX** con scores interpretables (0.67 = "2 de 3 intereses")
-- **Menor complejidad** computacional para casos de uso interactivo
+#### 1. Desarrollo del Smart Ranking Híbrido
+La evolución hacia Smart Ranking soluciona problemas críticos de UX:
+- **Comportamiento intuitivo**: Cursos con más palabras de la consulta aparecen primero
+- **Calidad mantenida**: Conserva sofisticación TF-IDF para casos complejos
+- **UX mejorada**: Elimina resultados contraintuitivos del TF-IDF puro
+- **Balance óptimo**: 5ms de tiempo vs resultados esperados por usuarios
 
 #### 2. Superioridad del Algoritmo Combined
 En pruebas con 78 cursos reales:
@@ -595,10 +604,10 @@ El componente semántico aporta valor significativo:
 ### Recomendaciones Técnicas
 
 #### Para Implementación en Producción
-1. **Usar Relevance** para búsqueda interactiva de usuarios
-2. **Usar Combined** para análisis académico y recomendaciones
+1. **Usar Smart Ranking** para búsqueda interactiva de usuarios (recomendado)
+2. **Usar Combined** para análisis académico y recomendaciones entre cursos
 3. **Implementar caché** para consultas frecuentes
-4. **Monitorear métricas** de rendimiento continuamente
+4. **Monitorear métricas** de rendimiento y satisfacción del usuario
 
 #### Para Investigación Futura
 1. **Word embeddings** para similitud semántica profunda
@@ -637,7 +646,7 @@ El proyecto implementa exitosamente un motor de busqueda completo con las siguie
 - Motor de busqueda con ranking por relevancia
 - Comparador de similitud con multiples algoritmos
 - Base de datos SQL con consultas optimizadas
-- 61 cursos indexados con más de 300 palabras clave unicas
+- 61 cursos indexados con 1,959 palabras clave unicas
 
 ### Valor Agregado
 - Integracion de funciones util sin dependencias externas
