@@ -2,6 +2,8 @@
 
 **Laboratorio 2 - Recuperación de Información**
 
+**Presentaciones:** https://motor-de-busqueda-curso.my.canva.site/  y  https://motor-de-busqueda-curso.my.canva.site/comandosyrespuestas
+
 ## Descripción
 
 Este proyecto implementa un motor de búsqueda completo para el catálogo de cursos de la Universidad Javeriana. El sistema incluye un rastreador web, un indexador, un comparador de similitud entre cursos con métricas de rendimiento avanzadas, y un motor de búsqueda por palabras clave con análisis de relevancia.
